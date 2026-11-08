@@ -4,6 +4,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from pathlib import Path
 import duckdb
+from datetime import datetime, timezone
 
 load_dotenv()
 api_key = os.getenv("TRAVELPAYOUTS_TOKEN")
@@ -12,10 +13,11 @@ DESTINATION = "FNC"
 DEPARTURE_AT = "2026-12"
 CURRENCY = "pln"  # API default is in rubles
 ONE_WAY = "false"  # round trips; lowercase text, because default False would be sent as "False"
+DB_PATH = Path("data/flights.duckdb")
 
 
 def fetch_flights(origin, destination, departure_at):
-    url = f"https://api.travelpayouts.com/aviasales/v3/prices_for_dates"
+    url = "https://api.travelpayouts.com/aviasales/v3/prices_for_dates"
     headers = {"X-Access-Token": api_key}
     params = {
         "origin": origin,
@@ -25,7 +27,6 @@ def fetch_flights(origin, destination, departure_at):
         "one_way": ONE_WAY,
     }
     response = requests.get(url, params=params, headers=headers)
-    print(response.url)
 
     response.raise_for_status()
 
@@ -39,5 +40,25 @@ def fetch_flights(origin, destination, departure_at):
 
 result = fetch_flights(ORIGIN, DESTINATION, DEPARTURE_AT)
 offers = result["data"]
-print(len(offers))
-print(offers[0]["price"])
+
+df = pd.json_normalize(offers)
+
+# one UTC timestamp for the whole run, so all offers from one check match
+checked_at = datetime.now(timezone.utc)
+df["checked_at"] = checked_at
+
+Path("data").mkdir(exist_ok=True)
+
+with duckdb.connect(str(DB_PATH)) as con:
+    con.execute("CREATE SCHEMA IF NOT EXISTS raw")
+    # empty table - only df columns; rows are only added by the INSERT below
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS raw.flight_prices AS SELECT * FROM df LIMIT 0"
+    )
+    # match columns by name, API doesn't guarantee column order
+    con.execute("INSERT INTO raw.flight_prices BY NAME SELECT * FROM df")
+    rows = con.execute("SELECT COUNT(*) FROM raw.flight_prices").fetchone()[0]
+    checks = con.execute(
+        "SELECT COUNT(DISTINCT checked_at) FROM raw.flight_prices"
+    ).fetchone()[0]
+print(f"rows = {rows}, checks = {checks}")
