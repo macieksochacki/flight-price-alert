@@ -47,13 +47,13 @@ def main():
         offers = result["data"]
 
         if len(offers) == 0:
-            print(f"Brak ofert: {ORIGIN}  {destination}")
+            print(f"No offers: {ORIGIN} {destination}")
             continue
 
         frames.append(pd.json_normalize(offers))
 
     if len(frames) == 0:
-        print("Brak ofert na żadnej trasie")
+        print("No offers on any route")
         return
 
     df = pd.concat(frames, ignore_index=True)
