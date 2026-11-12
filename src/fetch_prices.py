@@ -38,47 +38,44 @@ def fetch_flights(origin, destination, departure_at):
     return payload
 
 
-checked_at = datetime.now(timezone.utc)
-frames = []
+def main():
+    checked_at = datetime.now(timezone.utc)
+    frames = []
 
-for destination in DESTINATIONS:
-    result = fetch_flights(ORIGIN, destination, DEPARTURE_AT)
-    offers = result["data"]
+    for destination in DESTINATIONS:
+        result = fetch_flights(ORIGIN, destination, DEPARTURE_AT)
+        offers = result["data"]
 
-    if len(offers) == 0:
-        print(f"Brak ofert: {ORIGIN}  {destination}")
-        continue
+        if len(offers) == 0:
+            print(f"Brak ofert: {ORIGIN}  {destination}")
+            continue
 
-    frames.append(pd.json_normalize(offers))
+        frames.append(pd.json_normalize(offers))
 
-if len(frames) == 0:
-    print("Brak ofert na żadnej trasie")
-    raise SystemExit
+    if len(frames) == 0:
+        print("Brak ofert na żadnej trasie")
+        return
 
-df = pd.concat(frames, ignore_index=True)
+    df = pd.concat(frames, ignore_index=True)
 
-df["checked_at"] = checked_at
+    df["checked_at"] = checked_at
+
+    Path("data").mkdir(exist_ok=True)
+
+    with duckdb.connect(str(DB_PATH)) as con:
+        con.execute("CREATE SCHEMA IF NOT EXISTS raw")
+        # empty table - only df columns; rows are only added by the INSERT below
+        con.execute(
+            "CREATE TABLE IF NOT EXISTS raw.flight_prices AS SELECT * FROM df LIMIT 0"
+        )
+        # match columns by name, API doesn't guarantee column order
+        con.execute("INSERT INTO raw.flight_prices BY NAME SELECT * FROM df")
+        rows = con.execute("SELECT COUNT(*) FROM raw.flight_prices").fetchone()[0]
+        checks = con.execute(
+            "SELECT COUNT(DISTINCT checked_at) FROM raw.flight_prices"
+        ).fetchone()[0]
+    print(f"rows = {rows}, checks = {checks}")
 
 
-Path("data").mkdir(exist_ok=True)
-
-with duckdb.connect(str(DB_PATH)) as con:
-    con.execute("CREATE SCHEMA IF NOT EXISTS raw")
-    # empty table - only df columns; rows are only added by the INSERT below
-    con.execute(
-        "CREATE TABLE IF NOT EXISTS raw.flight_prices AS SELECT * FROM df LIMIT 0"
-    )
-    # match columns by name, API doesn't guarantee column order
-    con.execute("INSERT INTO raw.flight_prices BY NAME SELECT * FROM df")
-    rows = con.execute("SELECT COUNT(*) FROM raw.flight_prices").fetchone()[0]
-    checks = con.execute(
-        "SELECT COUNT(DISTINCT checked_at) FROM raw.flight_prices"
-    ).fetchone()[0]
-print(f"rows = {rows}, checks = {checks}")
-
-# 1. wybieramy destynacje - tym razem jako liste poniewaz kilka miejsc docelowych
-# pobieramy wszystkie dane i robimy z nich dataframe, do tego zapisujemy czas sprawdzenia
-# 2. do pobrania danych uzywamy pętli i odkladamy je na liste,
-# po pętli skladamy je w jedną tabelę
-# 3. tworzymy listę z ofertami, puste pomijamy lub dajemy krotki komunikat o braku
-#
+if __name__ == "__main__":
+    main()
