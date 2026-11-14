@@ -34,3 +34,21 @@ def test_fetch_flights_http_error(monkeypatch):
 
     with pytest.raises(requests.exceptions.HTTPError):
         fetch_prices.fetch_flights("GDN", "FNC", "2026-12")
+
+
+class FakeResponseOk:
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return {"success": True, "data": [{"price": 700}]}
+
+
+def test_fetch_flights_success_true(monkeypatch):
+    def fake_get(url, params=None, headers=None):
+        return FakeResponseOk()
+
+    monkeypatch.setattr(fetch_prices.requests, "get", fake_get)
+
+    result = fetch_prices.fetch_flights("GDN", "FNC", "2026-12")
+    assert result == {"success": True, "data": [{"price": 700}]}
