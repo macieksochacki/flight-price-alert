@@ -52,3 +52,13 @@ def test_fetch_flights_success_true(monkeypatch):
 
     result = fetch_prices.fetch_flights("GDN", "FNC", "2026-12")
     assert result == {"success": True, "data": [{"price": 700}]}
+
+
+def test_fetch_flights_timeout(monkeypatch):
+    def fake_get(url, params=None, headers=None, timeout=None):
+        raise requests.ReadTimeout
+
+    monkeypatch.setattr(fetch_prices.requests, "get", fake_get)
+
+    with pytest.raises(requests.ReadTimeout):
+        fetch_prices.fetch_flights("GDN", "FNC", "2026-12")
