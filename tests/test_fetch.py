@@ -12,7 +12,7 @@ class FakeResponse:
 
 
 def test_fetch_flights_success_false(monkeypatch):
-    def fake_get(url, params=None, headers=None):
+    def fake_get(url, params=None, headers=None, timeout=None):
         return FakeResponse()
 
     monkeypatch.setattr(fetch_prices.requests, "get", fake_get)
@@ -27,7 +27,7 @@ class FakeResponse500:
 
 
 def test_fetch_flights_http_error(monkeypatch):
-    def fake_get(url, params=None, headers=None):
+    def fake_get(url, params=None, headers=None, timeout=None):
         return FakeResponse500()
 
     monkeypatch.setattr(fetch_prices.requests, "get", fake_get)
@@ -45,7 +45,7 @@ class FakeResponseOk:
 
 
 def test_fetch_flights_success_true(monkeypatch):
-    def fake_get(url, params=None, headers=None):
+    def fake_get(url, params=None, headers=None, timeout=None):
         return FakeResponseOk()
 
     monkeypatch.setattr(fetch_prices.requests, "get", fake_get)

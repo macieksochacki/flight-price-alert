@@ -26,7 +26,7 @@ def fetch_flights(origin, destination, departure_at):
         "currency": CURRENCY,
         "one_way": ONE_WAY,
     }
-    response = requests.get(url, params=params, headers=headers)
+    response = requests.get(url, params=params, headers=headers, timeout=10)
 
     response.raise_for_status()
 
